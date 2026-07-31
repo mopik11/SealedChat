@@ -37,7 +37,13 @@
             </button>
         </div>
     </div>
-
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
+    <div id="emoji-picker-modal" class="hidden glass-panel" style="position: absolute; z-index: 999; padding: 1rem;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+            <button id="close-picker-btn" style="width: auto; padding: 0.2rem 0.5rem; background: rgba(255,255,255,0.1);">Zavřít</button>
+        </div>
+        <emoji-picker class="dark"></emoji-picker>
+    </div>
     <script src="main.js"></script>
 </body>
 </html>

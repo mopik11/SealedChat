@@ -100,8 +100,8 @@ async function encryptMessage(text) {
     combined.set(new Uint8Array(cipherGCM), ivGCM.length);
     currentData = combined;
 
-    // Vrstvy 2 až 1000: AES-CBC (999 dalších šifrování pro extrémní zátěž)
-    for (let i = 2; i <= 1000; i++) {
+    // Vrstvy 2 až 10000: AES-CBC (9999 dalších šifrování pro extrémní zátěž)
+    for (let i = 2; i <= 10000; i++) {
         const ivCBC = crypto.getRandomValues(new Uint8Array(16));
         const cipherCBC = await crypto.subtle.encrypt(
             { name: "AES-CBC", iv: ivCBC },
@@ -117,13 +117,13 @@ async function encryptMessage(text) {
     return arrayBufferToBase64(currentData.buffer);
 }
 
-// Vícenásobné dešifrování zprávy (1000 vrstev)
+// Vícenásobné dešifrování zprávy (10000 vrstev)
 async function decryptMessage(base64Payload) {
     try {
         let currentData = new Uint8Array(base64ToArrayBuffer(base64Payload));
         
-        // Rozbalení 999 vnějších vrstev AES-CBC (od vrstvy 1000 zpět k vrstvě 2)
-        for (let i = 1000; i >= 2; i--) {
+        // Rozbalení 9999 vnějších vrstev AES-CBC (od vrstvy 10000 zpět k vrstvě 2)
+        for (let i = 10000; i >= 2; i--) {
             const ivCBC = currentData.slice(0, 16);
             const cipherCBC = currentData.slice(16);
             
@@ -287,24 +287,30 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
     const reactionsContainer = document.createElement('div');
     reactionsContainer.className = 'reactions-container';
     
-    const btnLike = document.createElement('button');
-    btnLike.className = 'reaction-btn';
-    btnLike.textContent = '👍';
-    btnLike.onclick = () => sendReaction(id, '👍');
+    let pressTimer;
+    const startPress = (e) => {
+        if (e.type === 'touchstart' && e.touches.length > 1) return;
+        pressTimer = setTimeout(() => {
+            showFloatingMenu(id, wrapper);
+        }, 500);
+    };
     
-    const btnHeart = document.createElement('button');
-    btnHeart.className = 'reaction-btn';
-    btnHeart.textContent = '❤️';
-    btnHeart.onclick = () => sendReaction(id, '❤️');
+    const cancelPress = () => {
+        clearTimeout(pressTimer);
+    };
     
-    const btnHaha = document.createElement('button');
-    btnHaha.className = 'reaction-btn';
-    btnHaha.textContent = '😂';
-    btnHaha.onclick = () => sendReaction(id, '😂');
+    bubble.addEventListener('mousedown', startPress);
+    bubble.addEventListener('touchstart', startPress);
     
-    reactionsContainer.appendChild(btnLike);
-    reactionsContainer.appendChild(btnHeart);
-    reactionsContainer.appendChild(btnHaha);
+    bubble.addEventListener('mouseup', cancelPress);
+    bubble.addEventListener('mouseleave', cancelPress);
+    bubble.addEventListener('touchend', cancelPress);
+    bubble.addEventListener('touchmove', cancelPress);
+    
+    bubble.addEventListener('dblclick', () => {
+        cancelPress();
+        sendReaction(id, '❤️');
+    });
     
     wrapper.appendChild(reactionsContainer);
     messagesContainer.appendChild(wrapper);
@@ -314,11 +320,11 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
     if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
-        let layer = isMine ? 1 : 1000;
+        let layer = isMine ? 1 : 10000;
         const actionText = isMine ? "Zamykám" : "Odemykám";
         const icon = isMine ? "🔒" : "🔓";
         
-        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/1000...</div><div class="cipher-data"></div>`;
+        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/10000...</div><div class="cipher-data"></div>`;
         const badgeDiv = contentDiv.querySelector('.layer-badge');
         const dataDiv = contentDiv.querySelector('.cipher-data');
         
@@ -326,13 +332,13 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
             let gibberish = realCipher.split('').map(c => Math.random() > 0.6 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
             const displayLength = Math.max(text.length * 2, 40);
             
-            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/1000...`;
+            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/10000...`;
             dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
-            const step = Math.floor(Math.random() * 30) + 20;
+            const step = Math.floor(Math.random() * 300) + 200;
             if (isMine) layer += step; else layer -= step;
             
-            if ((isMine && layer >= 1000) || (!isMine && layer <= 0)) {
+            if ((isMine && layer >= 10000) || (!isMine && layer <= 0)) {
                 clearInterval(interval);
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
@@ -351,20 +357,28 @@ function appendReaction(messageId, author, emoji, isMine, realCipher) {
     
     const reactionsContainer = wrapper.querySelector('.reactions-container');
     
+    const existingPills = reactionsContainer.querySelectorAll('.reaction-pill');
+    existingPills.forEach(p => {
+        if (p.dataset.author === author) {
+            p.remove();
+        }
+    });
+    
     const pill = document.createElement('div');
     pill.className = 'reaction-pill cipher-text';
+    pill.dataset.author = author;
     
-    let layer = isMine ? 1 : 1000;
+    let layer = isMine ? 1 : 10000;
     const icon = isMine ? "🔒" : "🔓";
     
     const interval = setInterval(() => {
         let gibberish = realCipher.charAt(Math.floor(Math.random() * realCipher.length));
-        pill.textContent = `${icon} ${layer}/1000 ${gibberish}`;
+        pill.textContent = `${icon} ${layer}/10000 ${gibberish}`;
         
-        const step = Math.floor(Math.random() * 50) + 50;
+        const step = Math.floor(Math.random() * 500) + 200;
         if (isMine) layer += step; else layer -= step;
         
-        if ((isMine && layer >= 1000) || (!isMine && layer <= 0)) {
+        if ((isMine && layer >= 10000) || (!isMine && layer <= 0)) {
             clearInterval(interval);
             pill.className = 'reaction-pill decrypted-text';
             pill.textContent = `${emoji} ${author}`;
@@ -373,4 +387,69 @@ function appendReaction(messageId, author, emoji, isMine, realCipher) {
     
     reactionsContainer.appendChild(pill);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function showFloatingMenu(messageId, wrapperElement) {
+    const oldMenu = document.querySelector('.floating-reaction-menu');
+    if (oldMenu) oldMenu.remove();
+    
+    const menu = document.createElement('div');
+    menu.className = 'floating-reaction-menu';
+    
+    const emojis = ['👍', '😂', '😮', '😢'];
+    emojis.forEach(e => {
+        const btn = document.createElement('button');
+        btn.textContent = e;
+        btn.onclick = () => {
+            sendReaction(messageId, e);
+            menu.remove();
+        };
+        menu.appendChild(btn);
+    });
+    
+    const plusBtn = document.createElement('button');
+    plusBtn.textContent = '➕';
+    plusBtn.onclick = () => {
+        openEmojiPicker(messageId);
+        menu.remove();
+    };
+    menu.appendChild(plusBtn);
+    
+    wrapperElement.style.position = 'relative';
+    wrapperElement.appendChild(menu);
+    
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }, 10);
+}
+
+let activeMessageIdForPicker = null;
+const pickerModal = document.getElementById('emoji-picker-modal');
+const pickerElement = document.querySelector('emoji-picker');
+const closePickerBtn = document.getElementById('close-picker-btn');
+
+if (closePickerBtn && pickerModal && pickerElement) {
+    closePickerBtn.addEventListener('click', () => {
+        pickerModal.classList.add('hidden');
+    });
+
+    pickerElement.addEventListener('emoji-click', event => {
+        if (activeMessageIdForPicker) {
+            sendReaction(activeMessageIdForPicker, event.detail.unicode);
+            pickerModal.classList.add('hidden');
+        }
+    });
+}
+
+function openEmojiPicker(messageId) {
+    activeMessageIdForPicker = messageId;
+    pickerModal.classList.remove('hidden');
+    pickerModal.style.top = '50%';
+    pickerModal.style.left = '50%';
+    pickerModal.style.transform = 'translate(-50%, -50%)';
 }
