@@ -82,59 +82,62 @@ async function deriveKeys(password) {
     );
 }
 
-// Vícenásobné šifrování zprávy (Data -> AES-GCM -> AES-CBC)
+// Vícenásobné šifrování zprávy (Data -> 1x AES-GCM -> 29x AES-CBC = 30 vrstev)
 async function encryptMessage(text) {
     const enc = new TextEncoder();
-    const data = enc.encode(text);
+    let currentData = enc.encode(text);
     
-    // 1. vrstva: AES-GCM
+    // 1. vrstva: AES-GCM (vnitřní vrstva s ověřením integrity)
     const ivGCM = crypto.getRandomValues(new Uint8Array(12));
     const cipherGCM = await crypto.subtle.encrypt(
         { name: "AES-GCM", iv: ivGCM },
         roomKeyGCM,
-        data
+        currentData
     );
     
-    // Zabalíme IV a data z 1. vrstvy
-    const combinedGCM = new Uint8Array(ivGCM.length + cipherGCM.byteLength);
-    combinedGCM.set(ivGCM, 0);
-    combinedGCM.set(new Uint8Array(cipherGCM), ivGCM.length);
+    let combined = new Uint8Array(ivGCM.length + cipherGCM.byteLength);
+    combined.set(ivGCM, 0);
+    combined.set(new Uint8Array(cipherGCM), ivGCM.length);
+    currentData = combined;
 
-    // 2. vrstva: AES-CBC
-    const ivCBC = crypto.getRandomValues(new Uint8Array(16));
-    const cipherCBC = await crypto.subtle.encrypt(
-        { name: "AES-CBC", iv: ivCBC },
-        roomKeyCBC,
-        combinedGCM
-    );
-
-    // Konečný formát: IV_CBC (16 bytes) + šifrovaná data vrstvou 2
-    const finalPayload = new Uint8Array(ivCBC.length + cipherCBC.byteLength);
-    finalPayload.set(ivCBC, 0);
-    finalPayload.set(new Uint8Array(cipherCBC), ivCBC.length);
-
-    return arrayBufferToBase64(finalPayload.buffer);
-}
-
-// Vícenásobné dešifrování zprávy
-async function decryptMessage(base64Payload) {
-    try {
-        const payload = new Uint8Array(base64ToArrayBuffer(base64Payload));
-        
-        // 2. vrstva (vnější): Rozbalení AES-CBC
-        const ivCBC = payload.slice(0, 16);
-        const cipherCBC = payload.slice(16);
-        
-        const decryptedCBC = await crypto.subtle.decrypt(
+    // Vrstvy 2 až 30: AES-CBC (29 dalších šifrování pro maximální paranoiu)
+    for (let i = 2; i <= 30; i++) {
+        const ivCBC = crypto.getRandomValues(new Uint8Array(16));
+        const cipherCBC = await crypto.subtle.encrypt(
             { name: "AES-CBC", iv: ivCBC },
             roomKeyCBC,
-            cipherCBC
+            currentData
         );
+        let nextCombined = new Uint8Array(ivCBC.length + cipherCBC.byteLength);
+        nextCombined.set(ivCBC, 0);
+        nextCombined.set(new Uint8Array(cipherCBC), ivCBC.length);
+        currentData = nextCombined;
+    }
+
+    return arrayBufferToBase64(currentData.buffer);
+}
+
+// Vícenásobné dešifrování zprávy (30 vrstev)
+async function decryptMessage(base64Payload) {
+    try {
+        let currentData = new Uint8Array(base64ToArrayBuffer(base64Payload));
         
-        // 1. vrstva (vnitřní): Rozbalení AES-GCM
-        const combinedGCM = new Uint8Array(decryptedCBC);
-        const ivGCM = combinedGCM.slice(0, 12);
-        const cipherGCM = combinedGCM.slice(12);
+        // Rozbalení 29 vnějších vrstev AES-CBC (od vrstvy 30 zpět k vrstvě 2)
+        for (let i = 30; i >= 2; i--) {
+            const ivCBC = currentData.slice(0, 16);
+            const cipherCBC = currentData.slice(16);
+            
+            const decryptedCBC = await crypto.subtle.decrypt(
+                { name: "AES-CBC", iv: ivCBC },
+                roomKeyCBC,
+                cipherCBC
+            );
+            currentData = new Uint8Array(decryptedCBC);
+        }
+        
+        // Rozbalení 1. vnitřní vrstvy AES-GCM
+        const ivGCM = currentData.slice(0, 12);
+        const cipherGCM = currentData.slice(12);
         
         const decryptedGCM = await crypto.subtle.decrypt(
             { name: "AES-GCM", iv: ivGCM },
@@ -146,7 +149,7 @@ async function decryptMessage(base64Payload) {
         return dec.decode(decryptedGCM);
     } catch (e) {
         console.error("Chyba při dešifrování zprávy:", e);
-        return "[Chyba: Zprávu se nepodařilo dešifrovat. Pravděpodobně špatné heslo.]";
+        return "[Chyba: Zprávu se nepodařilo dešifrovat. Pravděpodobně špatné heslo nebo porušená data.]";
     }
 }
 
