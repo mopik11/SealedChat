@@ -100,8 +100,8 @@ async function encryptMessage(text) {
     combined.set(new Uint8Array(cipherGCM), ivGCM.length);
     currentData = combined;
 
-    // Vrstvy 2 až 30: AES-CBC (29 dalších šifrování pro maximální paranoiu)
-    for (let i = 2; i <= 30; i++) {
+    // Vrstvy 2 až 1000: AES-CBC (999 dalších šifrování pro extrémní zátěž)
+    for (let i = 2; i <= 1000; i++) {
         const ivCBC = crypto.getRandomValues(new Uint8Array(16));
         const cipherCBC = await crypto.subtle.encrypt(
             { name: "AES-CBC", iv: ivCBC },
@@ -117,13 +117,13 @@ async function encryptMessage(text) {
     return arrayBufferToBase64(currentData.buffer);
 }
 
-// Vícenásobné dešifrování zprávy (30 vrstev)
+// Vícenásobné dešifrování zprávy (1000 vrstev)
 async function decryptMessage(base64Payload) {
     try {
         let currentData = new Uint8Array(base64ToArrayBuffer(base64Payload));
         
-        // Rozbalení 29 vnějších vrstev AES-CBC (od vrstvy 30 zpět k vrstvě 2)
-        for (let i = 30; i >= 2; i--) {
+        // Rozbalení 999 vnějších vrstev AES-CBC (od vrstvy 1000 zpět k vrstvě 2)
+        for (let i = 1000; i >= 2; i--) {
             const ivCBC = currentData.slice(0, 16);
             const cipherCBC = currentData.slice(16);
             
@@ -201,9 +201,17 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             const decryptedContent = await decryptMessage(data.payload);
-            appendMessage(data.author, decryptedContent, false, data.time, true, data.payload);
+            
+            const msgType = data.type || 'chat';
+            
+            if (msgType === 'reaction') {
+                appendReaction(data.messageId, data.author, decryptedContent, false, data.payload);
+            } else {
+                const id = data.id || ('msg-' + Date.now() + Math.random());
+                appendMessage(id, data.author, decryptedContent, false, data.time, true, data.payload);
+            }
         } catch(e) {
-            console.error("Zpráva neobsahuje platná data:", e);
+            console.error("Zpráva neobsahuje platná data nebo nelze dešifrovat:", e);
         }
     };
 }
@@ -213,16 +221,16 @@ async function sendMessage() {
     if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
     
     messageInput.value = '';
-    
     const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const msgId = crypto.randomUUID();
     
-    // Zašifrujeme
     const encryptedPayload = await encryptMessage(text);
     
-    // Zobrazíme lokálně ihned s efektem skutečné šifry
-    appendMessage(username, text, true, time, true, encryptedPayload);
+    appendMessage(msgId, username, text, true, time, true, encryptedPayload);
     
     const msgObj = {
+        id: msgId,
+        type: 'chat',
         author: username,
         time: time,
         payload: encryptedPayload
@@ -231,14 +239,34 @@ async function sendMessage() {
     ws.send(JSON.stringify(msgObj));
 }
 
+async function sendReaction(messageId, emoji) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const encryptedPayload = await encryptMessage(emoji);
+    
+    appendReaction(messageId, username, emoji, true, encryptedPayload);
+    
+    const reactionObj = {
+        type: 'reaction',
+        messageId: messageId,
+        author: username,
+        payload: encryptedPayload
+    };
+    
+    ws.send(JSON.stringify(reactionObj));
+}
+
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
-function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false, realCipher = "") {
+function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = false, realCipher = "") {
+    const wrapper = document.createElement('div');
+    wrapper.className = `msg-wrapper ${isMine ? 'mine' : 'other'}`;
+    wrapper.dataset.id = id;
+    
     const bubble = document.createElement('div');
-    bubble.className = `msg-bubble ${isMine ? 'mine' : 'other'}`;
+    bubble.className = `msg-bubble`;
     
     const authorDiv = document.createElement('div');
     authorDiv.className = 'msg-author';
@@ -254,35 +282,57 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false,
     if (!isMine) bubble.appendChild(authorDiv);
     bubble.appendChild(contentDiv);
     bubble.appendChild(timeDiv);
+    wrapper.appendChild(bubble);
     
-    messagesContainer.appendChild(bubble);
+    const reactionsContainer = document.createElement('div');
+    reactionsContainer.className = 'reactions-container';
+    
+    const btnLike = document.createElement('button');
+    btnLike.className = 'reaction-btn';
+    btnLike.textContent = '👍';
+    btnLike.onclick = () => sendReaction(id, '👍');
+    
+    const btnHeart = document.createElement('button');
+    btnHeart.className = 'reaction-btn';
+    btnHeart.textContent = '❤️';
+    btnHeart.onclick = () => sendReaction(id, '❤️');
+    
+    const btnHaha = document.createElement('button');
+    btnHaha.className = 'reaction-btn';
+    btnHaha.textContent = '😂';
+    btnHaha.onclick = () => sendReaction(id, '😂');
+    
+    reactionsContainer.appendChild(btnLike);
+    reactionsContainer.appendChild(btnHeart);
+    reactionsContainer.appendChild(btnHaha);
+    
+    wrapper.appendChild(reactionsContainer);
+    messagesContainer.appendChild(wrapper);
+    
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
-        let layer = isMine ? 1 : 30;
+        let layer = isMine ? 1 : 1000;
         const actionText = isMine ? "Zamykám" : "Odemykám";
         const icon = isMine ? "🔒" : "🔓";
         
-        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/30...</div><div class="cipher-data"></div>`;
+        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/1000...</div><div class="cipher-data"></div>`;
         const badgeDiv = contentDiv.querySelector('.layer-badge');
         const dataDiv = contentDiv.querySelector('.cipher-data');
         
         const interval = setInterval(() => {
-            // Generujeme šum do šifry
             let gibberish = realCipher.split('').map(c => Math.random() > 0.6 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
             const displayLength = Math.max(text.length * 2, 40);
             
-            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/30...`;
+            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/1000...`;
             dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
-            // Náhodně měníme vrstvu, aby to nevypadalo moc strojově
-            if (Math.random() > 0.2) {
-                if (isMine) layer++; else layer--;
-            }
+            const step = Math.floor(Math.random() * 30) + 20;
+            if (isMine) layer += step; else layer -= step;
             
-            if ((isMine && layer > 30) || (!isMine && layer <= 0)) {
+            if ((isMine && layer >= 1000) || (!isMine && layer <= 0)) {
                 clearInterval(interval);
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
@@ -293,4 +343,34 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false,
     } else {
         contentDiv.textContent = text;
     }
+}
+
+function appendReaction(messageId, author, emoji, isMine, realCipher) {
+    const wrapper = document.querySelector(`.msg-wrapper[data-id="${messageId}"]`);
+    if (!wrapper) return;
+    
+    const reactionsContainer = wrapper.querySelector('.reactions-container');
+    
+    const pill = document.createElement('div');
+    pill.className = 'reaction-pill cipher-text';
+    
+    let layer = isMine ? 1 : 1000;
+    const icon = isMine ? "🔒" : "🔓";
+    
+    const interval = setInterval(() => {
+        let gibberish = realCipher.charAt(Math.floor(Math.random() * realCipher.length));
+        pill.textContent = `${icon} ${layer}/1000 ${gibberish}`;
+        
+        const step = Math.floor(Math.random() * 50) + 50;
+        if (isMine) layer += step; else layer -= step;
+        
+        if ((isMine && layer >= 1000) || (!isMine && layer <= 0)) {
+            clearInterval(interval);
+            pill.className = 'reaction-pill decrypted-text';
+            pill.textContent = `${emoji} ${author}`;
+        }
+    }, 50);
+    
+    reactionsContainer.appendChild(pill);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
