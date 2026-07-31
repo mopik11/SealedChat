@@ -335,7 +335,7 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
             badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/2000...`;
             dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
-            const step = Math.floor(Math.random() * 60) + 40;
+            const step = Math.floor(Math.random() * 15) + 20;
             if (isMine) layer += step; else layer -= step;
             
             if ((isMine && layer >= 2000) || (!isMine && layer <= 0)) {
@@ -375,7 +375,7 @@ function appendReaction(messageId, author, emoji, isMine, realCipher) {
         let gibberish = realCipher.charAt(Math.floor(Math.random() * realCipher.length));
         pill.textContent = `${icon} ${layer}/2000 ${gibberish}`;
         
-        const step = Math.floor(Math.random() * 80) + 50;
+        const step = Math.floor(Math.random() * 20) + 25;
         if (isMine) layer += step; else layer -= step;
         
         if ((isMine && layer >= 2000) || (!isMine && layer <= 0)) {

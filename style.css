@@ -67,16 +67,36 @@ body {
 /* Login Screen */
 #login-container {
     text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+#login-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+    animation: pulseBg 6s infinite alternate ease-in-out;
+    z-index: -1;
+}
+
+@keyframes pulseBg {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(1.2); opacity: 1; }
 }
 
 h1 {
     font-weight: 700;
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     margin-bottom: 0.5rem;
     background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -1px;
+    text-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
 }
 
 .subtitle {
@@ -111,7 +131,7 @@ input::placeholder {
 input:focus {
     border-color: var(--accent-primary);
     background: rgba(139, 92, 246, 0.05);
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
 }
 
 button {
@@ -130,8 +150,8 @@ button {
 }
 
 button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 25px -10px var(--accent-primary);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 15px 25px -10px var(--accent-primary), 0 0 15px rgba(14, 165, 233, 0.4);
 }
 
 button:active {
@@ -222,7 +242,7 @@ button:active {
     display: flex;
     flex-direction: column;
     max-width: 80%;
-    animation: messageSlideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation: messageBounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .msg-wrapper.mine {
@@ -235,9 +255,10 @@ button:active {
     align-items: flex-start;
 }
 
-@keyframes messageSlideIn {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes messageBounceIn {
+    0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+    70% { transform: translateY(-5px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .msg-bubble {
@@ -287,24 +308,6 @@ button:active {
     flex-wrap: wrap;
 }
 
-.reaction-btn {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 0.2rem 0.5rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: white;
-    box-shadow: none;
-    width: auto;
-}
-
-.reaction-btn:hover {
-    background: rgba(255,255,255,0.1);
-    transform: scale(1.1);
-}
-
 .reaction-pill {
     background: rgba(139, 92, 246, 0.2);
     border: 1px solid rgba(139, 92, 246, 0.3);
@@ -314,7 +317,7 @@ button:active {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    animation: popIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes popIn {
@@ -398,9 +401,53 @@ button:active {
     line-height: 1.3;
 }
 
-.floating-reaction-menu { position: absolute; bottom: -40px; right: 10px; display: flex; gap: 0.5rem; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--panel-border); border-radius: 20px; padding: 0.4rem; z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: popIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.floating-reaction-menu button { width: 35px; height: 35px; padding: 0; background: rgba(255,255,255,0.1); border-radius: 50%; font-size: 1.1rem; }
-.floating-reaction-menu button:hover { background: var(--accent-primary); }
-picker { --background: rgba(15, 23, 42, 0.9); --border-color: rgba(255,255,255,0.1); }
+/* Emoji Menu & Picker */
+.floating-reaction-menu { 
+    position: absolute; 
+    bottom: -45px; 
+    right: 0; 
+    display: flex; 
+    gap: 0.5rem; 
+    background: rgba(15, 23, 42, 0.95); 
+    border: 1px solid var(--accent-primary); 
+    border-radius: 20px; 
+    padding: 0.4rem; 
+    z-index: 10; 
+    box-shadow: 0 5px 25px rgba(139, 92, 246, 0.4); 
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    white-space: nowrap;
+}
+.floating-reaction-menu button { 
+    width: 35px; height: 35px; padding: 0; 
+    background: rgba(255,255,255,0.1); border-radius: 50%; font-size: 1.1rem; 
+}
+.floating-reaction-menu button:hover { 
+    background: var(--accent-primary); 
+    transform: scale(1.1);
+}
 
-@media (max-width: 600px) { body { min-height: 100dvh; } #chat-container { height: 100dvh; max-height: 100dvh; padding: 1rem; border-radius: 0; border: none; } .glass-panel { padding: 1rem; } }
+#emoji-picker-modal {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 9999;
+    max-width: 95vw;
+    width: 350px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+}
+emoji-picker { 
+    --background: transparent; 
+    --border-color: rgba(255,255,255,0.1); 
+    width: 100%;
+    max-height: 60dvh;
+}
+
+@media (max-width: 600px) { 
+    body { min-height: 100dvh; } 
+    #chat-container { height: 100dvh; max-height: 100dvh; padding: 1rem; border-radius: 0; border: none; } 
+    .glass-panel { padding: 1rem; } 
+}
