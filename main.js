@@ -58,7 +58,7 @@ async function deriveKeys(password) {
         {
             name: "PBKDF2",
             salt: salt,
-            iterations: 100000,
+            iterations: 20000,
             hash: "SHA-256"
         },
         keyMaterial,
@@ -72,7 +72,7 @@ async function deriveKeys(password) {
         {
             name: "PBKDF2",
             salt: salt,
-            iterations: 100000,
+            iterations: 20000,
             hash: "SHA-256"
         },
         keyMaterial,
@@ -100,8 +100,8 @@ async function encryptMessage(text) {
     combined.set(new Uint8Array(cipherGCM), ivGCM.length);
     currentData = combined;
 
-    // Vrstvy 2 až 10000: AES-CBC (9999 dalších šifrování pro extrémní zátěž)
-    for (let i = 2; i <= 10000; i++) {
+    // Vrstvy 2 až 2000: AES-CBC (1999 dalších šifrování pro extrémní zátěž)
+    for (let i = 2; i <= 2000; i++) {
         const ivCBC = crypto.getRandomValues(new Uint8Array(16));
         const cipherCBC = await crypto.subtle.encrypt(
             { name: "AES-CBC", iv: ivCBC },
@@ -117,13 +117,13 @@ async function encryptMessage(text) {
     return arrayBufferToBase64(currentData.buffer);
 }
 
-// Vícenásobné dešifrování zprávy (10000 vrstev)
+// Vícenásobné dešifrování zprávy (2000 vrstev)
 async function decryptMessage(base64Payload) {
     try {
         let currentData = new Uint8Array(base64ToArrayBuffer(base64Payload));
         
-        // Rozbalení 9999 vnějších vrstev AES-CBC (od vrstvy 10000 zpět k vrstvě 2)
-        for (let i = 10000; i >= 2; i--) {
+        // Rozbalení 1999 vnějších vrstev AES-CBC (od vrstvy 2000 zpět k vrstvě 2)
+        for (let i = 2000; i >= 2; i--) {
             const ivCBC = currentData.slice(0, 16);
             const cipherCBC = currentData.slice(16);
             
@@ -320,11 +320,11 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
     if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
-        let layer = isMine ? 1 : 10000;
+        let layer = isMine ? 1 : 2000;
         const actionText = isMine ? "Zamykám" : "Odemykám";
         const icon = isMine ? "🔒" : "🔓";
         
-        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/10000...</div><div class="cipher-data"></div>`;
+        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/2000...</div><div class="cipher-data"></div>`;
         const badgeDiv = contentDiv.querySelector('.layer-badge');
         const dataDiv = contentDiv.querySelector('.cipher-data');
         
@@ -332,13 +332,13 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
             let gibberish = realCipher.split('').map(c => Math.random() > 0.6 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
             const displayLength = Math.max(text.length * 2, 40);
             
-            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/10000...`;
+            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/2000...`;
             dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
             const step = Math.floor(Math.random() * 300) + 200;
             if (isMine) layer += step; else layer -= step;
             
-            if ((isMine && layer >= 10000) || (!isMine && layer <= 0)) {
+            if ((isMine && layer >= 2000) || (!isMine && layer <= 0)) {
                 clearInterval(interval);
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
@@ -368,17 +368,17 @@ function appendReaction(messageId, author, emoji, isMine, realCipher) {
     pill.className = 'reaction-pill cipher-text';
     pill.dataset.author = author;
     
-    let layer = isMine ? 1 : 10000;
+    let layer = isMine ? 1 : 2000;
     const icon = isMine ? "🔒" : "🔓";
     
     const interval = setInterval(() => {
         let gibberish = realCipher.charAt(Math.floor(Math.random() * realCipher.length));
-        pill.textContent = `${icon} ${layer}/10000 ${gibberish}`;
+        pill.textContent = `${icon} ${layer}/2000 ${gibberish}`;
         
         const step = Math.floor(Math.random() * 500) + 200;
         if (isMine) layer += step; else layer -= step;
         
-        if ((isMine && layer >= 10000) || (!isMine && layer <= 0)) {
+        if ((isMine && layer >= 2000) || (!isMine && layer <= 0)) {
             clearInterval(interval);
             pill.className = 'reaction-pill decrypted-text';
             pill.textContent = `${emoji} ${author}`;
