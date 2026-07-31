@@ -261,9 +261,11 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false,
     if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
-        let layer = 30;
+        let layer = isMine ? 1 : 30;
+        const actionText = isMine ? "Zamykám" : "Odemykám";
+        const icon = isMine ? "🔒" : "🔓";
         
-        contentDiv.innerHTML = `<div class="layer-badge">🔓 Odemykám vrstvu ${layer}/30...</div><div class="cipher-data"></div>`;
+        contentDiv.innerHTML = `<div class="layer-badge">${icon} ${actionText} vrstvu ${layer}/30...</div><div class="cipher-data"></div>`;
         const badgeDiv = contentDiv.querySelector('.layer-badge');
         const dataDiv = contentDiv.querySelector('.cipher-data');
         
@@ -272,15 +274,15 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false,
             let gibberish = realCipher.split('').map(c => Math.random() > 0.6 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
             const displayLength = Math.max(text.length * 2, 40);
             
-            badgeDiv.textContent = `🔓 Odemykám vrstvu ${layer}/30...`;
+            badgeDiv.textContent = `${icon} ${actionText} vrstvu ${layer}/30...`;
             dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
-            // Náhodně snižujeme vrstvu, aby to nevypadalo moc strojově
+            // Náhodně měníme vrstvu, aby to nevypadalo moc strojově
             if (Math.random() > 0.2) {
-                layer--;
+                if (isMine) layer++; else layer--;
             }
             
-            if (layer <= 0) {
+            if ((isMine && layer > 30) || (!isMine && layer <= 0)) {
                 clearInterval(interval);
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
