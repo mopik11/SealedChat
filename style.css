@@ -243,3 +243,6 @@ button:active {
 .cipher-text { font-family: monospace; color: #10b981; word-break: break-all; }
 .decrypted-text { animation: glow 1s ease; }
 @keyframes glow { 0% { color: #10b981; text-shadow: 0 0 10px #10b981; } 100% { color: inherit; text-shadow: none; } }
+
+.layer-badge { font-size: 0.7rem; color: #10b981; font-weight: bold; margin-bottom: 4px; padding: 2px 5px; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; display: inline-block; background: rgba(16, 185, 129, 0.1); }
+.cipher-data { word-break: break-all; opacity: 0.8; }

@@ -258,24 +258,30 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false,
     if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
-        let iterations = 0;
-        const maxIterations = 15;
+        let layer = 30;
+        
+        contentDiv.innerHTML = `<div class="layer-badge">🔓 Odemykám vrstvu ${layer}/30...</div><div class="cipher-data"></div>`;
+        const badgeDiv = contentDiv.querySelector('.layer-badge');
+        const dataDiv = contentDiv.querySelector('.cipher-data');
         
         const interval = setInterval(() => {
-            // Zobrazujeme opravdovou šifru (base64 string z AES) a občas v ní prohodíme znak,
-            // aby to vypadalo, že algoritmus právě luští klíč.
-            let gibberish = realCipher.split('').map(c => Math.random() > 0.85 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
+            // Generujeme šum do šifry
+            let gibberish = realCipher.split('').map(c => Math.random() > 0.6 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
+            const displayLength = Math.max(text.length * 2, 40);
             
-            // Pokud je zpráva krátká, ukážeme jen část šifry, ať zbytečně nenafukujeme bublinu
-            const displayLength = Math.max(text.length * 2, 30);
-            contentDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
+            badgeDiv.textContent = `🔓 Odemykám vrstvu ${layer}/30...`;
+            dataDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
             
-            iterations++;
+            // Náhodně snižujeme vrstvu, aby to nevypadalo moc strojově
+            if (Math.random() > 0.2) {
+                layer--;
+            }
             
-            if (iterations >= maxIterations) {
+            if (layer <= 0) {
                 clearInterval(interval);
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
+                contentDiv.innerHTML = '';
                 contentDiv.textContent = text;
             }
         }, 50);
