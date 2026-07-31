@@ -402,3 +402,5 @@ button:active {
 .floating-reaction-menu button { width: 35px; height: 35px; padding: 0; background: rgba(255,255,255,0.1); border-radius: 50%; font-size: 1.1rem; }
 .floating-reaction-menu button:hover { background: var(--accent-primary); }
 picker { --background: rgba(15, 23, 42, 0.9); --border-color: rgba(255,255,255,0.1); }
+
+@media (max-width: 600px) { body { min-height: 100dvh; } #chat-container { height: 100dvh; max-height: 100dvh; padding: 1rem; border-radius: 0; border: none; } .glass-panel { padding: 1rem; } }
