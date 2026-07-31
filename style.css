@@ -239,3 +239,7 @@ button:active {
     justify-content: center;
     align-items: center;
 }
+
+.cipher-text { font-family: monospace; color: #10b981; word-break: break-all; }
+.decrypted-text { animation: glow 1s ease; }
+@keyframes glow { 0% { color: #10b981; text-shadow: 0 0 10px #10b981; } 100% { color: inherit; text-shadow: none; } }

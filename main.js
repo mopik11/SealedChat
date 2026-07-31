@@ -166,6 +166,15 @@ joinBtn.addEventListener('click', async () => {
     // Generujeme šifrovací klíče z hesla
     await deriveKeys(password);
     
+    // Pokusíme se vynutit fullscreen na mobilech
+    if (document.documentElement.requestFullscreen && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        try {
+            await document.documentElement.requestFullscreen();
+        } catch(e) {
+            console.log("Fullscreen zamítnut:", e);
+        }
+    }
+    
     loginContainer.classList.add('hidden');
     chatContainer.classList.remove('hidden');
     
@@ -189,7 +198,7 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             const decryptedContent = await decryptMessage(data.payload);
-            appendMessage(data.author, decryptedContent, false, data.time);
+            appendMessage(data.author, decryptedContent, false, data.time, true);
         } catch(e) {
             console.error("Zpráva neobsahuje platná data:", e);
         }
@@ -204,8 +213,8 @@ async function sendMessage() {
     
     const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
-    // Zobrazíme lokálně ihned
-    appendMessage(username, text, true, time);
+    // Zobrazíme lokálně ihned s efektem šifrování
+    appendMessage(username, text, true, time, true);
     
     // Zašifrujeme a odešleme
     const encryptedPayload = await encryptMessage(text);
@@ -224,7 +233,7 @@ messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
-function appendMessage(author, text, isMine, timeStr) {
+function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false) {
     const bubble = document.createElement('div');
     bubble.className = `msg-bubble ${isMine ? 'mine' : 'other'}`;
     
@@ -234,7 +243,6 @@ function appendMessage(author, text, isMine, timeStr) {
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'msg-content';
-    contentDiv.textContent = text;
     
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-meta';
@@ -246,4 +254,30 @@ function appendMessage(author, text, isMine, timeStr) {
     
     messagesContainer.appendChild(bubble);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    if (isEncryptedEffect) {
+        contentDiv.classList.add('cipher-text');
+        
+        let iterations = 0;
+        const maxIterations = 15;
+        const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*";
+        
+        const interval = setInterval(() => {
+            let gibberish = "";
+            for(let i=0; i < text.length; i++) {
+                gibberish += text[i] === ' ' ? ' ' : charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            contentDiv.textContent = gibberish;
+            iterations++;
+            
+            if (iterations >= maxIterations) {
+                clearInterval(interval);
+                contentDiv.classList.remove('cipher-text');
+                contentDiv.classList.add('decrypted-text');
+                contentDiv.textContent = text;
+            }
+        }, 50);
+    } else {
+        contentDiv.textContent = text;
+    }
 }
