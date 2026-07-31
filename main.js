@@ -9,7 +9,7 @@ const sendBtn = document.getElementById('send-btn');
 const statusIndicator = document.getElementById('status-indicator');
 
 // Tuto URL bude automaticky měnit monitor.sh na RPi
-const TUNNEL_URL = "https://warm-demonstrated-ext-comparable.trycloudflare.com";
+const TUNNEL_URL = "https://clients-refer-firms-recovery.trycloudflare.com";
 const WS_URL = TUNNEL_URL.replace("https://", "wss://");
 // Pokud testuješ lokálně bez tunelu, odkomentuj:
 // const WS_URL = "ws://localhost:3001";
