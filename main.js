@@ -198,7 +198,7 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             const decryptedContent = await decryptMessage(data.payload);
-            appendMessage(data.author, decryptedContent, false, data.time, true);
+            appendMessage(data.author, decryptedContent, false, data.time, true, data.payload);
         } catch(e) {
             console.error("Zpráva neobsahuje platná data:", e);
         }
@@ -213,11 +213,11 @@ async function sendMessage() {
     
     const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
-    // Zobrazíme lokálně ihned s efektem šifrování
-    appendMessage(username, text, true, time, true);
-    
-    // Zašifrujeme a odešleme
+    // Zašifrujeme
     const encryptedPayload = await encryptMessage(text);
+    
+    // Zobrazíme lokálně ihned s efektem skutečné šifry
+    appendMessage(username, text, true, time, true, encryptedPayload);
     
     const msgObj = {
         author: username,
@@ -233,7 +233,7 @@ messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
-function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false) {
+function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false, realCipher = "") {
     const bubble = document.createElement('div');
     bubble.className = `msg-bubble ${isMine ? 'mine' : 'other'}`;
     
@@ -255,19 +255,21 @@ function appendMessage(author, text, isMine, timeStr, isEncryptedEffect = false)
     messagesContainer.appendChild(bubble);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    if (isEncryptedEffect) {
+    if (isEncryptedEffect && realCipher) {
         contentDiv.classList.add('cipher-text');
         
         let iterations = 0;
         const maxIterations = 15;
-        const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*";
         
         const interval = setInterval(() => {
-            let gibberish = "";
-            for(let i=0; i < text.length; i++) {
-                gibberish += text[i] === ' ' ? ' ' : charset.charAt(Math.floor(Math.random() * charset.length));
-            }
-            contentDiv.textContent = gibberish;
+            // Zobrazujeme opravdovou šifru (base64 string z AES) a občas v ní prohodíme znak,
+            // aby to vypadalo, že algoritmus právě luští klíč.
+            let gibberish = realCipher.split('').map(c => Math.random() > 0.85 ? String.fromCharCode(33 + Math.floor(Math.random() * 94)) : c).join('');
+            
+            // Pokud je zpráva krátká, ukážeme jen část šifry, ať zbytečně nenafukujeme bublinu
+            const displayLength = Math.max(text.length * 2, 30);
+            contentDiv.textContent = gibberish.substring(0, displayLength) + (realCipher.length > displayLength ? "..." : "");
+            
             iterations++;
             
             if (iterations >= maxIterations) {
