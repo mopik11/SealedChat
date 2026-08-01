@@ -642,12 +642,27 @@ async function uploadMedia(encryptedBlob) {
         method: 'POST',
         body: formData
     });
+    
+    if (!res.ok) {
+        const text = await res.text();
+        try {
+            const data = JSON.parse(text);
+            throw new Error(data.error || 'Neznámá chyba serveru');
+        } catch(e) {
+            throw new Error(`Chyba serveru (${res.status}). Pravděpodobně je soubor příliš velký.`);
+        }
+    }
+    
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
     return data.id;
 }
 
 async function handleMediaUpload(file, type) {
+    if (file.size > 80 * 1024 * 1024) {
+        alert("Soubor je příliš velký! Vyberte prosím soubor do velikosti 80 MB.");
+        return;
+    }
+    
     try {
         let finalBlob = file;
         
@@ -677,7 +692,7 @@ async function handleMediaUpload(file, type) {
         appendMessage(msgObj.id, username, sentHtml, true, msgObj.time, true, mediaPayload);
     } catch(err) {
         console.error('Media upload error', err);
-        alert('Chyba p�i odes�l�n� m�dia.');
+        alert('Chyba při odesílání média: ' + err.message);
     }
 }
 

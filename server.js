@@ -29,20 +29,23 @@ const storage = multer.diskStorage({
     }
 });
 
-// Zvýšíme limit nahrávání pro případná videa (např. do 50MB)
 const upload = multer({ 
     storage,
-    limits: { fileSize: 50 * 1024 * 1024 }
+    limits: { fileSize: 95 * 1024 * 1024 }
 });
 
 // Endpoint pro upload zašifrovaných médií
-app.post('/upload', upload.single('media'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'Nebyl nahrán žádný soubor' });
-    }
-    // Vrátíme ID souboru bez koncovky
-    const id = req.file.filename.replace('.enc', '');
-    res.json({ id });
+app.post('/upload', (req, res, next) => {
+    upload.single('media')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({ error: 'Chyba při nahrávání: ' + err.message });
+        }
+        if (!req.file) {
+            return res.status(400).json({ error: 'Nebyl nahrán žádný soubor' });
+        }
+        const id = req.file.filename.replace('.enc', '');
+        res.json({ id });
+    });
 });
 
 // Endpoint pro stažení (View-Once)
