@@ -210,7 +210,12 @@ function connectWebSocket() {
             
             const decryptedContent = await decryptMessage(data.payload);
             
-            if (msgType === 'reaction') {
+            if (msgType === 'image' || msgType === 'video' || msgType === 'audio') {
+                const typeName = msgType === 'image' ? 'Fotka' : (msgType === 'video' ? 'Video' : 'Hlasovka');
+                const icon = msgType === 'image' ? '📷' : (msgType === 'video' ? '🎥' : '🎤');
+                const btnHtml = `<div class="media-bubble"><div class="media-icon">${icon}</div><div class="media-info"><div class="media-title">Šifrovaná ${typeName.toLowerCase()}</div><div class="media-subtitle">View Once</div></div><button onclick="viewMediaOnce('${decryptedContent}', '${msgType}', '${data.id}')" class="media-open-btn">Otevřít</button></div>`;
+                appendMessage(data.id, data.author, btnHtml, false, data.time, true, data.payload);
+            } else if (msgType === 'reaction') {
                 appendReaction(data.messageId, data.author, decryptedContent, false, data.payload);
             } else {
                 const id = data.id || ('msg-' + Date.now() + Math.random());
@@ -378,7 +383,7 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
                 contentDiv.innerHTML = '';
-                if (typeof text === 'string' && text.includes('media-btn')) {
+                if (typeof text === 'string' && (text.includes('media-btn') || text.includes('media-bubble'))) {
                     contentDiv.innerHTML = text;
                 } else {
                     contentDiv.textContent = text;
@@ -386,7 +391,7 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
             }
         }, 50);
     } else {
-        if (typeof text === 'string' && text.includes('media-btn')) {
+        if (typeof text === 'string' && (text.includes('media-btn') || text.includes('media-bubble'))) {
             contentDiv.innerHTML = text;
         } else {
             contentDiv.textContent = text;
@@ -580,7 +585,10 @@ async function handleMediaUpload(file, type) {
         };
         
         ws.send(JSON.stringify(msgObj));
-        appendMessage(msgObj.id, username, "[Odesláno " + (type === 'image' ? 'Foto' : (type === 'video' ? 'Video' : 'Hlasovka')) + "]", true, msgObj.time, true, mediaPayload);
+        const typeName = type === 'image' ? 'Fotka' : (type === 'video' ? 'Video' : 'Hlasovka');
+        const icon = type === 'image' ? '📷' : (type === 'video' ? '🎥' : '🎤');
+        const sentHtml = `<div class="media-bubble"><div class="media-icon">${icon}</div><div class="media-info"><div class="media-title">${typeName}</div><div class="media-subtitle">Odesláno (View Once)</div></div></div>`;
+        appendMessage(msgObj.id, username, sentHtml, true, msgObj.time, true, mediaPayload);
     } catch(err) {
         console.error('Media upload error', err);
         alert('Chyba p�i odes�l�n� m�dia.');
@@ -687,7 +695,13 @@ async function viewMediaOnce(mediaId, mediaType, messageId) {
         const encryptedBlob = await res.blob();
         const decryptedBlob = await decryptMedia(encryptedBlob);
         
-        const url = URL.createObjectURL(decryptedBlob);
+        let mimeType = 'application/octet-stream';
+        if (mediaType === 'image') mimeType = 'image/jpeg';
+        if (mediaType === 'video') mimeType = 'video/mp4';
+        if (mediaType === 'audio') mimeType = 'audio/webm';
+        
+        const typedBlob = new Blob([decryptedBlob], { type: mimeType });
+        const url = URL.createObjectURL(typedBlob);
         
         mediaContentContainer.innerHTML = '';
         if (mediaType === 'image') {
@@ -716,7 +730,9 @@ async function viewMediaOnce(mediaId, mediaType, messageId) {
         // Mark as viewed locally
         const wrapper = document.querySelector('.msg-wrapper[data-id="' + messageId + '"] .msg-content');
         if(wrapper) {
-            wrapper.innerHTML = '<span class="deleted-message">Zobrazeno a zničeno.</span>';
+            const typeName = mediaType === 'image' ? 'Fotka' : (mediaType === 'video' ? 'Video' : 'Hlasovka');
+            const icon = mediaType === 'image' ? '📷' : (mediaType === 'video' ? '🎥' : '🎤');
+            wrapper.innerHTML = `<div class="media-bubble destroyed"><div class="media-icon">${icon}</div><div class="media-info"><div class="media-title">${typeName}</div><div class="media-subtitle">Zobrazeno a zničeno</div></div></div>`;
         }
         
     } catch(err) {

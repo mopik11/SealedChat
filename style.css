@@ -460,3 +460,43 @@ emoji-picker {
 }
 
 .fullscreen-modal { position: fixed !important; top: 0 !important; left: 0 !important; transform: none !important; width: 100vw; height: 100dvh; max-width: none; border-radius: 0; z-index: 10000; display: flex; flex-direction: column; padding: 0; background: rgba(0,0,0,0.95); } .media-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background: rgba(10, 10, 10, 0.8); position: absolute; top: 0; width: 100%; z-index: 2; } .media-warning { color: var(--danger); font-weight: bold; font-size: 1.1rem; text-shadow: 0 0 10px rgba(239, 68, 68, 0.5); } #close-media-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; } #media-content-container { flex: 1; display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; overflow: hidden; } #media-content-container img, #media-content-container video { max-width: 100%; max-height: 100%; object-fit: contain; animation: popIn 0.3s ease; } .media-btn { background: linear-gradient(135deg, var(--accent-primary), var(--danger)); color: white; padding: 0.8rem 1.5rem; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; text-align: center; margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 1rem; width: auto; } .deleted-message { opacity: 0.5; font-style: italic; color: var(--text-secondary); } .recording-active { animation: pulseBg 1s infinite alternate; background: var(--danger) !important; color: white !important; }
+
+.media-bubble {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.3);
+    padding: 10px 15px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    min-width: 200px;
+}
+.media-icon {
+    font-size: 24px;
+}
+.media-info {
+    flex: 1;
+}
+.media-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.media-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.media-open-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.media-bubble.destroyed {
+    opacity: 0.7;
+    filter: grayscale(1);
+}
+
