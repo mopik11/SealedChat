@@ -431,6 +431,13 @@ async function sendMessage() {
     if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
     
     messageInput.value = '';
+    
+    // Reset toggle po odeslani
+    const recordBtnToggle = document.getElementById('record-audio-btn');
+    if (recordBtnToggle) {
+        recordBtnToggle.classList.remove('hidden');
+        sendBtn.classList.add('hidden');
+    }
     const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     const msgId = crypto.randomUUID();
     
@@ -468,6 +475,17 @@ async function sendReaction(messageId, emoji) {
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
+});
+
+const recordBtnToggle = document.getElementById('record-audio-btn');
+messageInput.addEventListener('input', () => {
+    if (messageInput.value.trim() !== '') {
+        recordBtnToggle.classList.add('hidden');
+        sendBtn.classList.remove('hidden');
+    } else {
+        recordBtnToggle.classList.remove('hidden');
+        sendBtn.classList.add('hidden');
+    }
 });
 
 function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = false, realCipher = "") {
