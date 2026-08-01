@@ -151,7 +151,6 @@ async function decryptMessage(base64Payload) {
         console.error("Chyba při dešifrování zprávy:", e);
         return "[Chyba: Zprávu se nepodařilo dešifrovat. Pravděpodobně špatné heslo nebo porušená data.]";
     }
-    }
 }
 
 async function generateKeyFingerprint() {
