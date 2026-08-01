@@ -173,19 +173,39 @@ async function generateKeyFingerprint() {
 }
 
 // Ochrana soukromí (Zčernání při minimalizaci / ztrátě focusu)
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        document.body.classList.add('privacy-blur');
-    } else {
-        document.body.classList.remove('privacy-blur');
-    }
-});
-window.addEventListener('blur', () => {
+let isPrivacyLocked = false;
+const applyPrivacyLock = () => {
+    if (isPrivacyLocked) return;
+    isPrivacyLocked = true;
     document.body.classList.add('privacy-blur');
+    
+    const messageContainer = document.createElement("div");
+    messageContainer.id = "refresh-message";
+    messageContainer.style.position = "fixed";
+    messageContainer.style.top = "50%";
+    messageContainer.style.left = "50%";
+    messageContainer.style.transform = "translate(-50%, -50%)";
+    messageContainer.style.backgroundColor = "#1a1a1a";
+    messageContainer.style.color = "white";
+    messageContainer.style.padding = "30px";
+    messageContainer.style.borderRadius = "15px";
+    messageContainer.style.zIndex = "1000000";
+    messageContainer.style.textAlign = "center";
+    messageContainer.style.border = "1px solid rgba(255,255,255,0.1)";
+    messageContainer.style.boxShadow = "0 10px 30px rgba(0,0,0,0.5)";
+    messageContainer.innerHTML = `
+        <h2 style="margin-top:0; color: #ff4757;">🔒 Bezpečnostní zámek</h2>
+        <p style="margin-bottom: 20px; color: #ddd;">
+          Z bezpečnostních důvodů proti snímkům obrazovky (nebo opuštění okna) byla aplikace uzamčena. Historie chatu bude smazána.
+        </p>
+        <button style="background-color: #ff4757; color: white; padding: 12px 24px; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1rem;" onclick="window.location.reload()">Obnovit aplikaci</button>`;
+    document.body.appendChild(messageContainer);
+};
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) applyPrivacyLock();
 });
-window.addEventListener('focus', () => {
-    document.body.classList.remove('privacy-blur');
-});
+window.addEventListener('blur', applyPrivacyLock);
 
 // Připojení a chat logika
 joinBtn.addEventListener('click', async () => {

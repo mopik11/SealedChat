@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap');
+ï»¿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap');
 
 :root {
     --bg-base: #030014;
@@ -558,9 +558,9 @@ emoji-picker {
 }
 
 
-/* Privacy Screen (Ochrana proti screenshotùm a nahlížení) */
+/* Privacy Screen (Ochrana proti screenshotÅ¯m a nahlÃ­Å¾enÃ­) */
 body.privacy-blur::after {
-    content: "?? Zabezpeèeno";
+    content: "?? ZabezpeÄeno";
     position: fixed;
     top: 0;
     left: 0;
@@ -575,7 +575,7 @@ body.privacy-blur::after {
     font-weight: 600;
     z-index: 999999;
 }
-body.privacy-blur > * {
+body.privacy-blur > *:not(#refresh-message) {
     filter: blur(20px) brightness(0) !important;
     pointer-events: none !important;
 }
