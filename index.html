@@ -31,6 +31,9 @@
             <!-- Zprávy -->
         </div>
         <div class="input-area">
+            <button id="attach-btn" title="Přiložit fotku/video">📷</button>
+            <button id="record-audio-btn" title="Nahrát hlasovku">🎤</button>
+            <input type="file" id="file-input" accept="image/*,video/*" class="hidden">
             <input type="text" id="message-input" placeholder="Napiš bezpečnou zprávu..." autocomplete="off">
             <button id="send-btn">
                 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="css-i6dzq1"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -43,6 +46,14 @@
             <button id="close-picker-btn" style="width: auto; padding: 0.2rem 0.5rem; background: rgba(255,255,255,0.1);">Zavřít</button>
         </div>
         <emoji-picker class="dark"></emoji-picker>
+    </div>
+
+    <div id="media-viewer-modal" class="hidden fullscreen-modal glass-panel">
+        <div class="media-header">
+            <span class="media-warning">⚠️ Mizející zpráva (View Once)</span>
+            <button id="close-media-btn">X</button>
+        </div>
+        <div id="media-content-container"></div>
     </div>
     <script src="main.js"></script>
 </body>

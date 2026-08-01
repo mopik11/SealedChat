@@ -191,6 +191,199 @@ function connectWebSocket() {
         statusIndicator.classList.add('connected');
     };
     
+const loginContainer = document.getElementById('login-container');
+const chatContainer = document.getElementById('chat-container');
+const joinBtn = document.getElementById('join-btn');
+const usernameInput = document.getElementById('username-input');
+const passwordInput = document.getElementById('password-input');
+const messagesContainer = document.getElementById('messages-container');
+const messageInput = document.getElementById('message-input');
+const sendBtn = document.getElementById('send-btn');
+const statusIndicator = document.getElementById('status-indicator');
+
+// Tuto URL bude automaticky měnit monitor.sh na RPi
+const TUNNEL_URL = "https://clients-refer-firms-recovery.trycloudflare.com";
+const WS_URL = TUNNEL_URL.replace("https://", "wss://");
+// Pokud testuješ lokálně bez tunelu, odkomentuj:
+// const WS_URL = "ws://localhost:3001";
+
+let ws;
+let username = '';
+let roomKeyGCM = null;
+let roomKeyCBC = null;
+
+// Pomocné funkce pro base64 konverzi
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+    const binary_string = window.atob(base64);
+    const len = binary_string.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// Generování klíčů (Vícenásobné šifrování: AES-GCM a AES-CBC)
+async function deriveKeys(password) {
+    const enc = new TextEncoder();
+    // Salt is fixed for simplicity in this example so users joining later can derive the same keys
+    const salt = enc.encode("SecureChat_Salt_V1");
+    
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveBits", "deriveKey"]
+    );
+    
+    // Klíč 1: AES-GCM (1. vrstva šifrování E2EE)
+    roomKeyGCM = await crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: salt,
+            iterations: 20000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+
+    // Klíč 2: AES-CBC (2. vrstva šifrování E2EE)
+    roomKeyCBC = await crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt: salt,
+            iterations: 20000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-CBC", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+// Vícenásobné šifrování zprávy (Data -> 1x AES-GCM -> 29x AES-CBC = 30 vrstev)
+async function encryptMessage(text) {
+    const enc = new TextEncoder();
+    let currentData = enc.encode(text);
+    
+    // 1. vrstva: AES-GCM (vnitřní vrstva s ověřením integrity)
+    const ivGCM = crypto.getRandomValues(new Uint8Array(12));
+    const cipherGCM = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: ivGCM },
+        roomKeyGCM,
+        currentData
+    );
+    
+    let combined = new Uint8Array(ivGCM.length + cipherGCM.byteLength);
+    combined.set(ivGCM, 0);
+    combined.set(new Uint8Array(cipherGCM), ivGCM.length);
+    currentData = combined;
+
+    // Vrstvy 2 až 2000: AES-CBC (1999 dalších šifrování pro extrémní zátěž)
+    for (let i = 2; i <= 2000; i++) {
+        const ivCBC = crypto.getRandomValues(new Uint8Array(16));
+        const cipherCBC = await crypto.subtle.encrypt(
+            { name: "AES-CBC", iv: ivCBC },
+            roomKeyCBC,
+            currentData
+        );
+        let nextCombined = new Uint8Array(ivCBC.length + cipherCBC.byteLength);
+        nextCombined.set(ivCBC, 0);
+        nextCombined.set(new Uint8Array(cipherCBC), ivCBC.length);
+        currentData = nextCombined;
+    }
+
+    return arrayBufferToBase64(currentData.buffer);
+}
+
+// Vícenásobné dešifrování zprávy (2000 vrstev)
+async function decryptMessage(base64Payload) {
+    try {
+        let currentData = new Uint8Array(base64ToArrayBuffer(base64Payload));
+        
+        // Rozbalení 1999 vnějších vrstev AES-CBC (od vrstvy 2000 zpět k vrstvě 2)
+        for (let i = 2000; i >= 2; i--) {
+            const ivCBC = currentData.slice(0, 16);
+            const cipherCBC = currentData.slice(16);
+            
+            const decryptedCBC = await crypto.subtle.decrypt(
+                { name: "AES-CBC", iv: ivCBC },
+                roomKeyCBC,
+                cipherCBC
+            );
+            currentData = new Uint8Array(decryptedCBC);
+        }
+        
+        // Rozbalení 1. vnitřní vrstvy AES-GCM
+        const ivGCM = currentData.slice(0, 12);
+        const cipherGCM = currentData.slice(12);
+        
+        const decryptedGCM = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: ivGCM },
+            roomKeyGCM,
+            cipherGCM
+        );
+        
+        const dec = new TextDecoder();
+        return dec.decode(decryptedGCM);
+    } catch (e) {
+        console.error("Chyba při dešifrování zprávy:", e);
+        return "[Chyba: Zprávu se nepodařilo dešifrovat. Pravděpodobně špatné heslo nebo porušená data.]";
+    }
+}
+
+// Připojení a chat logika
+joinBtn.addEventListener('click', async () => {
+    username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+    
+    if (!username || !password) {
+        alert("Vyplň jméno i heslo!");
+        return;
+    }
+    
+    joinBtn.disabled = true;
+    joinBtn.textContent = "Generuji klíče...";
+    
+    // Generujeme šifrovací klíče z hesla
+    await deriveKeys(password);
+    
+    // Pokusíme se vynutit fullscreen na mobilech
+    if (document.documentElement.requestFullscreen && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        try {
+            await document.documentElement.requestFullscreen();
+        } catch(e) {
+            console.log("Fullscreen zamítnut:", e);
+        }
+    }
+    
+    loginContainer.classList.add('hidden');
+    chatContainer.classList.remove('hidden');
+    
+    connectWebSocket();
+});
+
+function connectWebSocket() {
+    ws = new WebSocket(WS_URL);
+    
+    ws.onopen = () => {
+        statusIndicator.classList.add('connected');
+    };
+    
     ws.onclose = () => {
         statusIndicator.classList.remove('connected');
         // Zkusíme se znovu připojit za 3s
@@ -200,15 +393,32 @@ function connectWebSocket() {
     ws.onmessage = async (event) => {
         try {
             const data = JSON.parse(event.data);
-            const decryptedContent = await decryptMessage(data.payload);
-            
             const msgType = data.type || 'chat';
+            
+            if (msgType === 'delete') {
+                const msgEl = document.querySelector('.msg-wrapper[data-id="' + data.messageId + '"]');
+                if (msgEl) msgEl.remove();
+                return;
+            }
+            
+            const decryptedContent = await decryptMessage(data.payload);
             
             if (msgType === 'reaction') {
                 appendReaction(data.messageId, data.author, decryptedContent, false, data.payload);
             } else {
                 const id = data.id || ('msg-' + Date.now() + Math.random());
-                appendMessage(id, data.author, decryptedContent, false, data.time, true, data.payload);
+                
+                let textToDisplay = decryptedContent;
+                try {
+                    const parsed = JSON.parse(decryptedContent);
+                    if (parsed.type === 'media') {
+                        const icon = parsed.mediaType === 'image' ? '📸' : (parsed.mediaType === 'video' ? '🎬' : '🎤');
+                        const label = parsed.mediaType === 'image' ? 'Zobrazit Fotku' : (parsed.mediaType === 'video' ? 'Přehrát Video' : 'Přehrát Hlasovku');
+                        textToDisplay = `<button class="media-btn" onclick="viewMediaOnce('${parsed.mediaId}', '${parsed.mediaType}', '${id}')">${icon} ${label}</button>`;
+                    }
+                } catch(e) {}
+                
+                appendMessage(id, data.author, textToDisplay, false, data.time, true, data.payload);
             }
         } catch(e) {
             console.error("Zpráva neobsahuje platná data nebo nelze dešifrovat:", e);
@@ -343,11 +553,19 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
                 contentDiv.classList.remove('cipher-text');
                 contentDiv.classList.add('decrypted-text');
                 contentDiv.innerHTML = '';
-                contentDiv.textContent = text;
+                if (typeof text === 'string' && text.includes('media-btn')) {
+                    contentDiv.innerHTML = text;
+                } else {
+                    contentDiv.textContent = text;
+                }
             }
         }, 50);
     } else {
-        contentDiv.textContent = text;
+        if (typeof text === 'string' && text.includes('media-btn')) {
+            contentDiv.innerHTML = text;
+        } else {
+            contentDiv.textContent = text;
+        }
     }
 }
 
@@ -415,6 +633,14 @@ function showFloatingMenu(messageId, wrapperElement) {
     };
     menu.appendChild(plusBtn);
     
+    const trashBtn = document.createElement('button');
+    trashBtn.textContent = '🗑️';
+    trashBtn.onclick = () => {
+        deleteMessage(messageId);
+        menu.remove();
+    };
+    menu.appendChild(trashBtn);
+    
     wrapperElement.style.position = 'relative';
     wrapperElement.appendChild(menu);
     
@@ -453,3 +679,223 @@ function openEmojiPicker(messageId) {
     pickerModal.style.left = '50%';
     pickerModal.style.transform = 'translate(-50%, -50%)';
 }
+
+async function deleteMessage(messageId) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    
+    const msgEl = document.querySelector('.msg-wrapper[data-id="' + messageId + '"]');
+    if (msgEl) msgEl.remove();
+    
+    const delObj = {
+        type: 'delete',
+        messageId: messageId
+    };
+    ws.send(JSON.stringify(delObj));
+}
+
+// --- Media E2EE & Upload Logic ---
+async function encryptMedia(blob) {
+    if (!roomKeyGCM) throw new Error("Chybí klíč");
+    const arrayBuffer = await blob.arrayBuffer();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cipherBuffer = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        roomKeyGCM,
+        arrayBuffer
+    );
+    return new Blob([iv, cipherBuffer]);
+}
+
+async function decryptMedia(blob) {
+    if (!roomKeyGCM) throw new Error("Chyb� kl��");
+    const arrayBuffer = await blob.arrayBuffer();
+    const iv = arrayBuffer.slice(0, 12);
+    const data = arrayBuffer.slice(12);
+    const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(iv) },
+        roomKeyGCM,
+        data
+    );
+    return new Blob([decrypted]);
+}
+
+async function uploadMedia(encryptedBlob) {
+    const formData = new FormData();
+    formData.append('media', encryptedBlob);
+    const res = await fetch('http://' + window.location.hostname + ':3001/upload', {
+        method: 'POST',
+        body: formData
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.id;
+}
+
+async function handleMediaUpload(file, type) {
+    try {
+        let finalBlob = file;
+        
+        // Jednoduch� komprese obr�zku p�es canvas
+        if (type === 'image' && file.type.startsWith('image/')) {
+            finalBlob = await compressImage(file);
+        }
+        
+        const encrypted = await encryptMedia(finalBlob);
+        const mediaId = await uploadMedia(encrypted);
+        
+        const mediaPayload = JSON.stringify({ type: 'media', mediaType: type, mediaId: mediaId });
+        const encryptedMsg = await encryptMessage(mediaPayload);
+        
+        const msgObj = {
+            id: generateId(),
+            type: 'chat',
+            author: username,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            payload: encryptedMsg
+        };
+        
+        ws.send(JSON.stringify(msgObj));
+        appendMessage(msgObj.id, username, "[Odesl�no " + (type === 'image' ? 'Foto' : (type === 'video' ? 'Video' : 'Hlasovka')) + "]", true, msgObj.time, true, mediaPayload);
+    } catch(err) {
+        console.error('Media upload error', err);
+        alert('Chyba p�i odes�l�n� m�dia.');
+    }
+}
+
+function compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width;
+                let h = img.height;
+                const max = 1200;
+                if (w > max || h > max) {
+                    if (w > h) { h = Math.round(h *= max / w); w = max; }
+                    else { w = Math.round(w *= max / h); h = max; }
+                }
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.7);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Media UI Listeners
+const fileInput = document.getElementById('file-input');
+const attachBtn = document.getElementById('attach-btn');
+const recordBtn = document.getElementById('record-audio-btn');
+let mediaRecorder;
+let audioChunks = [];
+
+if(attachBtn && fileInput) {
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const type = file.type.startsWith('video/') ? 'video' : 'image';
+        handleMediaUpload(file, type);
+        fileInput.value = '';
+    });
+}
+
+if (recordBtn) {
+    recordBtn.addEventListener('mousedown', startRecording);
+    recordBtn.addEventListener('touchstart', startRecording);
+    
+    recordBtn.addEventListener('mouseup', stopRecording);
+    recordBtn.addEventListener('mouseleave', stopRecording);
+    recordBtn.addEventListener('touchend', stopRecording);
+}
+
+async function startRecording(e) {
+    e.preventDefault();
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 32000 });
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            stream.getTracks().forEach(t => t.stop());
+            if (audioBlob.size > 0) handleMediaUpload(audioBlob, 'audio');
+        };
+        mediaRecorder.start();
+        recordBtn.classList.add('recording-active');
+    } catch(err) {
+        alert('P��stup k mikrofonu byl odep�en.');
+    }
+}
+
+function stopRecording(e) {
+    e.preventDefault();
+    if(mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        recordBtn.classList.remove('recording-active');
+    }
+}
+
+// Media Viewer Logic
+const mediaViewer = document.getElementById('media-viewer-modal');
+const closeMediaBtn = document.getElementById('close-media-btn');
+const mediaContentContainer = document.getElementById('media-content-container');
+
+if(closeMediaBtn) {
+    closeMediaBtn.addEventListener('click', () => {
+        mediaViewer.classList.add('hidden');
+        mediaContentContainer.innerHTML = '';
+    });
+}
+
+async function viewMediaOnce(mediaId, mediaType, messageId) {
+    try {
+        // Fetch encrypted blob
+        const res = await fetch('http://' + window.location.hostname + ':3001/download/' + mediaId);
+        if (!res.ok) throw new Error('Soubor ji� neexistuje.');
+        
+        const encryptedBlob = await res.blob();
+        const decryptedBlob = await decryptMedia(encryptedBlob);
+        
+        const url = URL.createObjectURL(decryptedBlob);
+        
+        mediaContentContainer.innerHTML = '';
+        if (mediaType === 'image') {
+            const img = document.createElement('img');
+            img.src = url;
+            mediaContentContainer.appendChild(img);
+        } else if (mediaType === 'video') {
+            const vid = document.createElement('video');
+            vid.src = url;
+            vid.controls = true;
+            vid.autoplay = true;
+            mediaContentContainer.appendChild(vid);
+        } else if (mediaType === 'audio') {
+            const aud = document.createElement('audio');
+            aud.src = url;
+            aud.controls = true;
+            aud.autoplay = true;
+            mediaContentContainer.appendChild(aud);
+        }
+        
+        mediaViewer.classList.remove('hidden');
+        
+        // Delete request to server (View Once destruct)
+        await fetch('http://' + window.location.hostname + ':3001/delete/' + mediaId, { method: 'DELETE' });
+        
+        // Mark as viewed locally
+        const wrapper = document.querySelector('.msg-wrapper[data-id="' + messageId + '"] .msg-content');
+        if(wrapper) {
+            wrapper.innerHTML = '<span class="deleted-message">Zobrazeno a zni�eno.</span>';
+        }
+        
+    } catch(err) {
+        alert(err.message);
+    }
+}
+
