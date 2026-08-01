@@ -572,7 +572,7 @@ async function handleMediaUpload(file, type) {
         const encryptedMsg = await encryptMessage(mediaPayload);
         
         const msgObj = {
-            id: generateId(),
+            id: crypto.randomUUID(),
             type: 'chat',
             author: username,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
