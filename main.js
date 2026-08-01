@@ -63,7 +63,7 @@ async function deriveKeys(password) {
         },
         keyMaterial,
         { name: "AES-GCM", length: 256 },
-        false,
+        true,
         ["encrypt", "decrypt"]
     );
 
