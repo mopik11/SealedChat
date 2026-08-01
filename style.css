@@ -580,3 +580,19 @@ body.privacy-blur > *:not(#refresh-message) {
     pointer-events: none !important;
 }
 
+
+/* Ochrana proti kopirovani textu */
+body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+/* Povoleni vyberu v inputech, aby se dalo psat */
+input, textarea {
+    -webkit-user-select: auto;
+    -moz-user-select: auto;
+    -ms-user-select: auto;
+    user-select: auto;
+}
+
