@@ -576,7 +576,7 @@ body.privacy-blur::after {
     z-index: 999999;
 }
 body.privacy-blur > *:not(#refresh-message) {
-    filter: blur(20px) brightness(0) !important;
+    filter: blur(20px) brightness(0.5) !important;
     pointer-events: none !important;
 }
 

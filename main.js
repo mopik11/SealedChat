@@ -174,8 +174,9 @@ async function generateKeyFingerprint() {
 
 // Ochrana soukromí (Zčernání při minimalizaci / ztrátě focusu)
 let isPrivacyLocked = false;
+let skipNextBlur = false;
 const applyPrivacyLock = () => {
-    if (isPrivacyLocked) return;
+    if (isPrivacyLocked || skipNextBlur) return;
     isPrivacyLocked = true;
     document.body.classList.add('privacy-blur');
     
@@ -206,6 +207,9 @@ document.addEventListener('visibilitychange', () => {
     if (document.hidden) applyPrivacyLock();
 });
 window.addEventListener('blur', applyPrivacyLock);
+window.addEventListener('focus', () => {
+    skipNextBlur = false;
+});
 
 // Zakázání kliknutí pravým tlačítkem myši (ochrana prvků)
 document.addEventListener('contextmenu', function(event) {
@@ -710,7 +714,10 @@ let mediaRecorder;
 let audioChunks = [];
 
 if(attachBtn && fileInput) {
-    attachBtn.addEventListener('click', () => fileInput.click());
+    attachBtn.addEventListener('click', () => {
+        skipNextBlur = true;
+        fileInput.click();
+    });
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if(!file) return;
