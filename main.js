@@ -347,6 +347,12 @@ function appendMessage(id, author, text, isMine, timeStr, isEncryptedEffect = fa
     bubble.addEventListener('touchend', cancelPress);
     bubble.addEventListener('touchmove', cancelPress);
     
+    bubble.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        cancelPress();
+        showFloatingMenu(id, wrapper);
+    });
+    
     bubble.addEventListener('dblclick', () => {
         cancelPress();
         sendReaction(id, '❤️');
