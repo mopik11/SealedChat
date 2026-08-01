@@ -500,3 +500,60 @@ emoji-picker {
     filter: grayscale(1);
 }
 
+
+.audio-player-bubble {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.3);
+    padding: 10px 15px;
+    border-radius: 20px;
+    min-width: 150px;
+}
+.audio-play-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: white;
+    color: black;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+.audio-waveform {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    height: 35px;
+}
+.audio-bar {
+    width: 3px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 2px;
+    transition: height 0.2s ease;
+}
+.audio-timer {
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: white;
+    color: black;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+.audio-player-bubble.playing .audio-bar {
+    animation: wave 1.2s ease-in-out infinite alternate;
+}
+.audio-player-bubble.playing .audio-bar:nth-child(even) {
+    animation-delay: 0.2s;
+}
+.audio-player-bubble.playing .audio-bar:nth-child(3n) {
+    animation-delay: 0.4s;
+}
+@keyframes wave {
+    0% { transform: scaleY(0.4); }
+    100% { transform: scaleY(1.2); }
+}
+

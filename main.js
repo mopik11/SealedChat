@@ -210,12 +210,7 @@ function connectWebSocket() {
             
             const decryptedContent = await decryptMessage(data.payload);
             
-            if (msgType === 'image' || msgType === 'video' || msgType === 'audio') {
-                const typeName = msgType === 'image' ? 'Fotka' : (msgType === 'video' ? 'Video' : 'Hlasovka');
-                const icon = msgType === 'image' ? '📷' : (msgType === 'video' ? '🎥' : '🎤');
-                const btnHtml = `<div class="media-bubble"><div class="media-icon">${icon}</div><div class="media-info"><div class="media-title">Šifrovaná ${typeName.toLowerCase()}</div><div class="media-subtitle">View Once</div></div><button onclick="viewMediaOnce('${decryptedContent}', '${msgType}', '${data.id}')" class="media-open-btn">Otevřít</button></div>`;
-                appendMessage(data.id, data.author, btnHtml, false, data.time, true, data.payload);
-            } else if (msgType === 'reaction') {
+            if (msgType === 'reaction') {
                 appendReaction(data.messageId, data.author, decryptedContent, false, data.payload);
             } else {
                 const id = data.id || ('msg-' + Date.now() + Math.random());
@@ -224,9 +219,28 @@ function connectWebSocket() {
                 try {
                     const parsed = JSON.parse(decryptedContent);
                     if (parsed.type === 'media') {
-                        const icon = parsed.mediaType === 'image' ? '📸' : (parsed.mediaType === 'video' ? '🎬' : '🎤');
-                        const label = parsed.mediaType === 'image' ? 'Zobrazit Fotku' : (parsed.mediaType === 'video' ? 'Přehrát Video' : 'Přehrát Hlasovku');
-                        textToDisplay = `<button class="media-btn" onclick="viewMediaOnce('${parsed.mediaId}', '${parsed.mediaType}', '${id}')">${icon} ${label}</button>`;
+                        if (parsed.mediaType === 'audio') {
+                            const mime = parsed.mimeType || 'audio/webm';
+                            textToDisplay = `
+                            <div class="media-bubble audio-player-bubble" id="audio-player-${id}">
+                                <button class="audio-play-btn" onclick="window.playInlineAudio('${parsed.mediaId}', '${id}', '${mime}')">▶️</button>
+                                <div class="audio-waveform">
+                                    <div class="audio-bar" style="height:10px"></div>
+                                    <div class="audio-bar" style="height:15px"></div>
+                                    <div class="audio-bar" style="height:8px"></div>
+                                    <div class="audio-bar" style="height:20px"></div>
+                                    <div class="audio-bar" style="height:12px"></div>
+                                    <div class="audio-bar" style="height:18px"></div>
+                                    <div class="audio-bar" style="height:6px"></div>
+                                    <div class="audio-bar" style="height:14px"></div>
+                                </div>
+                                <div class="audio-timer">▶</div>
+                            </div>`;
+                        } else {
+                            const typeName = parsed.mediaType === 'image' ? 'Fotka' : 'Video';
+                            const icon = parsed.mediaType === 'image' ? '📷' : '🎥';
+                            textToDisplay = `<div class="media-bubble"><div class="media-icon">${icon}</div><div class="media-info"><div class="media-title">Šifrovaná ${typeName.toLowerCase()}</div><div class="media-subtitle">View Once</div></div><button onclick="viewMediaOnce('${parsed.mediaId}', '${parsed.mediaType}', '${id}')" class="media-open-btn">Otevřít</button></div>`;
+                        }
                     }
                 } catch(e) {}
                 
@@ -579,7 +593,7 @@ async function handleMediaUpload(file, type) {
         const encrypted = await encryptMedia(finalBlob);
         const mediaId = await uploadMedia(encrypted);
         
-        const mediaPayload = JSON.stringify({ type: 'media', mediaType: type, mediaId: mediaId });
+        const mediaPayload = JSON.stringify({ type: 'media', mediaType: type, mediaId: mediaId, mimeType: finalBlob.type });
         const encryptedMsg = await encryptMessage(mediaPayload);
         
         const msgObj = {
@@ -745,4 +759,51 @@ async function viewMediaOnce(mediaId, mediaType, messageId) {
         alert(err.message);
     }
 }
+
+window.playInlineAudio = async function(mediaId, messageId, mimeType) {
+    const playerWrapper = document.getElementById('audio-player-' + messageId);
+    if (!playerWrapper) return;
+    
+    const playBtn = playerWrapper.querySelector('.audio-play-btn');
+    if (playBtn.dataset.playing) return;
+    
+    playBtn.innerHTML = '⏳';
+    playBtn.dataset.playing = "true";
+    
+    try {
+        const res = await fetch(TUNNEL_URL + '/download/' + mediaId);
+        if (!res.ok) throw new Error('Soubor již neexistuje.');
+        
+        const encryptedBlob = await res.blob();
+        const decryptedBlob = await decryptMedia(encryptedBlob);
+        
+        const url = URL.createObjectURL(new Blob([decryptedBlob], { type: mimeType || 'audio/webm' }));
+        const audio = new Audio(url);
+        
+        audio.onplay = () => {
+            playBtn.innerHTML = '⏸️';
+            playerWrapper.classList.add('playing');
+        };
+        audio.onended = () => {
+            playerWrapper.innerHTML = `<div class="media-icon">🎤</div><div class="media-info"><div class="media-title">Hlasovka</div><div class="media-subtitle">Přehráno a zničeno</div></div>`;
+            playerWrapper.classList.add('destroyed');
+            fetch(TUNNEL_URL + '/delete/' + mediaId, { method: 'DELETE' });
+        };
+        audio.onerror = (e) => {
+            alert('Prohlížeč nedokázal přehrát tento formát zvuku (' + mimeType + ')');
+            playBtn.innerHTML = '▶️';
+            playBtn.dataset.playing = "";
+        };
+        
+        audio.play().catch(e => {
+            alert('Nelze přehrát: ' + e.message);
+            playBtn.innerHTML = '▶️';
+            playBtn.dataset.playing = "";
+        });
+    } catch(e) {
+        alert("Chyba: " + e.message);
+        playBtn.innerHTML = '▶️';
+        playBtn.dataset.playing = "";
+    }
+};
 
