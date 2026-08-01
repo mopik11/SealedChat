@@ -532,7 +532,7 @@ async function encryptMedia(blob) {
 }
 
 async function decryptMedia(blob) {
-    if (!roomKeyGCM) throw new Error("Chyb� kl��");
+    if (!roomKeyGCM) throw new Error("Chybí klíč");
     const arrayBuffer = await blob.arrayBuffer();
     const iv = arrayBuffer.slice(0, 12);
     const data = arrayBuffer.slice(12);
@@ -547,7 +547,7 @@ async function decryptMedia(blob) {
 async function uploadMedia(encryptedBlob) {
     const formData = new FormData();
     formData.append('media', encryptedBlob);
-    const res = await fetch('http://' + window.location.hostname + ':3001/upload', {
+    const res = await fetch(TUNNEL_URL + '/upload', {
         method: 'POST',
         body: formData
     });
@@ -580,7 +580,7 @@ async function handleMediaUpload(file, type) {
         };
         
         ws.send(JSON.stringify(msgObj));
-        appendMessage(msgObj.id, username, "[Odesl�no " + (type === 'image' ? 'Foto' : (type === 'video' ? 'Video' : 'Hlasovka')) + "]", true, msgObj.time, true, mediaPayload);
+        appendMessage(msgObj.id, username, "[Odesláno " + (type === 'image' ? 'Foto' : (type === 'video' ? 'Video' : 'Hlasovka')) + "]", true, msgObj.time, true, mediaPayload);
     } catch(err) {
         console.error('Media upload error', err);
         alert('Chyba p�i odes�l�n� m�dia.');
@@ -681,8 +681,8 @@ if(closeMediaBtn) {
 async function viewMediaOnce(mediaId, mediaType, messageId) {
     try {
         // Fetch encrypted blob
-        const res = await fetch('http://' + window.location.hostname + ':3001/download/' + mediaId);
-        if (!res.ok) throw new Error('Soubor ji� neexistuje.');
+        const res = await fetch(TUNNEL_URL + '/download/' + mediaId);
+        if (!res.ok) throw new Error('Soubor již neexistuje.');
         
         const encryptedBlob = await res.blob();
         const decryptedBlob = await decryptMedia(encryptedBlob);
@@ -711,12 +711,12 @@ async function viewMediaOnce(mediaId, mediaType, messageId) {
         mediaViewer.classList.remove('hidden');
         
         // Delete request to server (View Once destruct)
-        await fetch('http://' + window.location.hostname + ':3001/delete/' + mediaId, { method: 'DELETE' });
+        await fetch(TUNNEL_URL + '/delete/' + mediaId, { method: 'DELETE' });
         
         // Mark as viewed locally
         const wrapper = document.querySelector('.msg-wrapper[data-id="' + messageId + '"] .msg-content');
         if(wrapper) {
-            wrapper.innerHTML = '<span class="deleted-message">Zobrazeno a zni�eno.</span>';
+            wrapper.innerHTML = '<span class="deleted-message">Zobrazeno a zničeno.</span>';
         }
         
     } catch(err) {
