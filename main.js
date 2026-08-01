@@ -151,7 +151,42 @@ async function decryptMessage(base64Payload) {
         console.error("Chyba při dešifrování zprávy:", e);
         return "[Chyba: Zprávu se nepodařilo dešifrovat. Pravděpodobně špatné heslo nebo porušená data.]";
     }
+    }
 }
+
+async function generateKeyFingerprint() {
+    const exported = await crypto.subtle.exportKey("raw", roomKeyGCM);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", exported);
+    const hashArray = new Uint8Array(hashBuffer);
+    
+    const emojis = ["🚀", "🍎", "🔑", "🌟", "🔥", "💎", "🍕", "🎸", "🍔", "🌈", "🧩", "🦄", "🍀", "🍩", "⚽", "🌍", "🐱", "🐶", "🦁", "🍓", "🍉", "🥥", "🍿", "🏀", "🎲", "🎯"];
+    
+    let emojiStr = "";
+    for(let i=0; i<3; i++) {
+        const index = hashArray[i] % emojis.length;
+        emojiStr += emojis[index];
+    }
+    
+    const headerTitle = document.querySelector('.chat-header h2');
+    if (headerTitle) {
+        headerTitle.innerHTML = 'SealedChat <span style="font-size: 1rem; margin-left: 10px; padding: 4px 8px; background: rgba(0,0,0,0.4); border-radius: 12px; cursor: help;" title="Bezpečnostní kód klíče (Pokud má kamarád jiná 3 emoji, někdo z vás zadal špatné heslo!)">' + emojiStr + '</span>';
+    }
+}
+
+// Ochrana soukromí (Zčernání při minimalizaci / ztrátě focusu)
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        document.body.classList.add('privacy-blur');
+    } else {
+        document.body.classList.remove('privacy-blur');
+    }
+});
+window.addEventListener('blur', () => {
+    document.body.classList.add('privacy-blur');
+});
+window.addEventListener('focus', () => {
+    document.body.classList.remove('privacy-blur');
+});
 
 // Připojení a chat logika
 joinBtn.addEventListener('click', async () => {
@@ -168,14 +203,17 @@ joinBtn.addEventListener('click', async () => {
     
     // Generujeme šifrovací klíče z hesla
     await deriveKeys(password);
+    await generateKeyFingerprint();
     
-    // Pokusíme se vynutit fullscreen na mobilech
-    if (document.documentElement.requestFullscreen && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        try {
+    // Pokusíme se vynutit fullscreen pokaždé (bez ohledu na zařízení)
+    try {
+        if (document.documentElement.requestFullscreen) {
             await document.documentElement.requestFullscreen();
-        } catch(e) {
-            console.log("Fullscreen zamítnut:", e);
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            await document.documentElement.webkitRequestFullscreen();
         }
+    } catch(e) {
+        console.log("Fullscreen zamítnut:", e);
     }
     
     loginContainer.classList.add('hidden');

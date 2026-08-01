@@ -557,3 +557,26 @@ emoji-picker {
     100% { transform: scaleY(1.2); }
 }
 
+
+/* Privacy Screen (Ochrana proti screenshotùm a nahlížení) */
+body.privacy-blur::after {
+    content: "?? Zabezpeèeno";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 600;
+    z-index: 999999;
+}
+body.privacy-blur > * {
+    filter: blur(20px) brightness(0) !important;
+    pointer-events: none !important;
+}
+
